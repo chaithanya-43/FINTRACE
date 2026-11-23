@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Environment and local configuration
+.env
+.env.local
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# JavaScript
+node_modules/
+frontend/dist/
+
+# Database and evidence storage
+storage/*
+!storage/.gitkeep
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+
+# Logs and coverage
+*.log
+.coverage
+htmlcov/
+coverage/
