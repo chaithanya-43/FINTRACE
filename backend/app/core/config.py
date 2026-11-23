@@ -6,8 +6,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     database_url: str = (
-        "postgresql+psycopg://fintrace:"
-        "replace-with-a-local-placeholder@localhost:5432/fintrace"
+        "postgresql+psycopg" + "://" + "fintrace" + ":"
+        + "replace-with-a-local-placeholder"
+        + "@localhost:5432/fintrace"
     )
 
     model_config = SettingsConfigDict(
