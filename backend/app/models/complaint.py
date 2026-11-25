@@ -77,6 +77,14 @@ class Complaint(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ),
         Index("ix_complaints_case_id", "case_id"),
         Index("ix_complaints_case_channel", "case_id", "channel"),
+        Index(
+            "uq_complaints_case_channel_reference",
+            "case_id",
+            "channel",
+            "reference_number",
+            unique=True,
+            postgresql_where=text("reference_number IS NOT NULL"),
+        ),
         Index("ix_complaints_submission_status", "submission_status"),
         Index("ix_complaints_official_status", "official_status"),
     )

@@ -16,6 +16,7 @@ from app.utils.enums import (
     RecoveryPriority,
     RecoveryStatus,
 )
+from app.utils.sensitive import assert_no_authentication_secrets
 
 
 def list_actions(db: Session, case_id: uuid.UUID) -> list[RecoveryAction]:
@@ -111,6 +112,9 @@ def build_roadmap(db: Session, *, case: Case, user: User) -> dict:
 def create_action(db: Session, *, case: Case, user: User, data: dict) -> RecoveryAction:
     if case.is_archived:
         raise Conflict("Archived cases are read-only.")
+    assert_no_authentication_secrets(
+        data.get("title"), data.get("description"), data.get("instructions")
+    )
     priority = data.get("priority") or RecoveryPriority.MEDIUM.value
     if priority not in {item.value for item in RecoveryPriority}:
         raise InvalidRequest(f"Unknown priority '{priority}'.")
@@ -170,6 +174,9 @@ def update_action(
     changes = {key: value for key, value in data.items() if value is not None}
     if not changes:
         return action
+    assert_no_authentication_secrets(
+        changes.get("title"), changes.get("description"), changes.get("outcome_notes")
+    )
 
     if "status" in changes and changes["status"] not in {item.value for item in RecoveryStatus}:
         raise InvalidRequest(f"Unknown status '{changes['status']}'.")

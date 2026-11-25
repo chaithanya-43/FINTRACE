@@ -59,7 +59,8 @@ def missing_information(
         missing.append("Transaction details: amount, date, and UTR or reference if available.")
     if evidence_count == 0:
         missing.append("Evidence: bank alerts, screenshots or a statement.")
-    if not extracted["utr_references"] and transactions:
+    has_recorded_utr = any((item.utr_reference or "").strip() for item in transactions)
+    if transactions and not has_recorded_utr and not extracted["utr_references"]:
         missing.append("UTR or reference numbers for the transactions, if your bank shows them.")
     return missing
 

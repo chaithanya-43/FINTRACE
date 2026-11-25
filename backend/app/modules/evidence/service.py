@@ -15,6 +15,7 @@ from app.utils.enums import (
     AuditAction,
     EvidenceVerificationStatus,
 )
+from app.utils.sensitive import assert_no_authentication_secrets
 
 HASH_DISCLAIMER = (
     "The SHA-256 hash proves the stored file matches the bytes recorded at upload. "
@@ -52,6 +53,7 @@ def upload_evidence(
 ) -> Evidence:
     if case.is_archived:
         raise Conflict("Archived cases are read-only.")
+    assert_no_authentication_secrets(description, upload.filename)
 
     content_type = (upload.content_type or "application/octet-stream").lower()
     if content_type not in settings.allowed_evidence_type_list:

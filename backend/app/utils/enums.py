@@ -157,6 +157,25 @@ class AuditAction(StrEnum):
     COMPLAINT_CREATED = "complaint.created"
     COMPLAINT_UPDATED = "complaint.updated"
     COMPLAINT_STATUS_OBSERVED = "complaint.status_observed"
+    DOCUMENT_DRAFT_CREATED = "document_draft.created"
+    DOCUMENT_DRAFT_UPDATED = "document_draft.updated"
+
+
+DOCUMENT_TYPES: tuple[str, ...] = (
+    "cybercrime_complaint",
+    "bank_fraud_complaint",
+    "transaction_dispute_letter",
+    "upi_fraud_complaint",
+    "police_complaint",
+    "follow_up_letter",
+    "escalation_letter",
+)
+
+
+class DocumentDraftStatus(StrEnum):
+    DRAFT = "draft"
+    REVIEWED = "reviewed"
+    EXPORTED = "exported"
 
 
 FRAUD_CATEGORIES: tuple[str, ...] = (

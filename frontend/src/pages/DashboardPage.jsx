@@ -181,6 +181,9 @@ export default function DashboardPage() {
           </ul>
           <hr className="divider" style={{ margin: "0.9rem 0" }} />
           <div className="stack" style={{ gap: "0.6rem" }}>
+            <Link to="/documents" className="text-button">
+              Document &amp; Complaint Assistant →
+            </Link>
             <Link to="/regulatory" className="text-button">
               Regulatory intelligence →
             </Link>

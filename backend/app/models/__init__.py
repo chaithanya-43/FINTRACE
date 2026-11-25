@@ -8,6 +8,7 @@ from app.models.audit_event import AuditEvent
 from app.models.case import Case
 from app.models.complaint import Complaint
 from app.models.complaint_status_event import ComplaintStatusEvent
+from app.models.document_draft import DocumentDraft
 from app.models.evidence import Evidence
 from app.models.evidence_signature import EvidenceSignature
 from app.models.recovery_action import RecoveryAction
@@ -22,6 +23,7 @@ __all__ = [
     "Case",
     "Complaint",
     "ComplaintStatusEvent",
+    "DocumentDraft",
     "Evidence",
     "EvidenceSignature",
     "RecoveryAction",

@@ -8,6 +8,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import Conflict, InvalidRequest, NotFound
@@ -49,7 +50,11 @@ def list_complaints(db: Session, case_id: uuid.UUID) -> list[Complaint]:
 def create_complaint(db: Session, *, case: Case, user: User, data: dict) -> Complaint:
     if case.is_archived:
         raise Conflict("Archived cases are read-only.")
-    assert_no_authentication_secrets(data.get("notes"))
+    assert_no_authentication_secrets(
+        data.get("notes"),
+        data.get("organisation_name"),
+        data.get("reference_number"),
+    )
 
     channel = _assert_channel(data["channel"])
     status = data.get("submission_status") or SubmissionStatus.DRAFT.value
@@ -65,7 +70,7 @@ def create_complaint(db: Session, *, case: Case, user: User, data: dict) -> Comp
         case_id=case.id,
         channel=channel,
         organisation_name=data.get("organisation_name"),
-        reference_number=data.get("reference_number"),
+        reference_number=(data.get("reference_number") or "").strip() or None,
         submission_status=status,
         filed_at=filed_at,
         created_by_user_id=user.id,
@@ -75,7 +80,16 @@ def create_complaint(db: Session, *, case: Case, user: User, data: dict) -> Comp
         complaint.acknowledged_at = datetime.now(UTC)
 
     db.add(complaint)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_complaints_case_channel_reference" in str(exc.orig):
+            raise Conflict(
+                "A complaint with this channel and reference number already exists in this case.",
+                code="duplicate_complaint_reference",
+            ) from exc
+        raise
     audit.record(
         db,
         action=AuditAction.COMPLAINT_CREATED,
@@ -124,8 +138,13 @@ def update_complaint(
     changes = {key: value for key, value in data.items() if value is not None}
     if not changes:
         return complaint
+    assert_no_authentication_secrets(
+        changes.get("organisation_name"), changes.get("reference_number")
+    )
     if "channel" in changes:
         changes["channel"] = _assert_channel(changes["channel"])
+    if "reference_number" in changes:
+        changes["reference_number"] = changes["reference_number"].strip() or None
 
     status = changes.get("submission_status")
     if status is not None:
@@ -145,6 +164,17 @@ def update_complaint(
     for field, value in changes.items():
         setattr(complaint, field, value)
     complaint.updated_at = datetime.now(UTC)
+
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_complaints_case_channel_reference" in str(exc.orig):
+            raise Conflict(
+                "A complaint with this channel and reference number already exists in this case.",
+                code="duplicate_complaint_reference",
+            ) from exc
+        raise
 
     audit.record(
         db,
@@ -167,6 +197,7 @@ def add_status_event(
     """Append an observation and refresh the cached official status."""
     if case.is_archived:
         raise Conflict("Archived cases are read-only.")
+    assert_no_authentication_secrets(data.get("observed_status"), data.get("status_detail"))
 
     checked_at = data.get("checked_at") or datetime.now(UTC)
     event = ComplaintStatusEvent(

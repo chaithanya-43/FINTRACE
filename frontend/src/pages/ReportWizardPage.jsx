@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-import { ErrorBanner, Field, Notice } from "../components/ui";
+import { Icon } from "../components/Icons";
+import { Card, ErrorBanner, Field, Notice } from "../components/ui";
 import {
   AUTHORIZATION_TYPES,
   FRAUD_CATEGORIES,
@@ -40,6 +41,7 @@ const initialForm = {
   incident_occurred_at: nowLocal(),
   description: "",
   reporting_details: "",
+  no_financial_loss: false,
   amount: "",
   transaction_at: nowLocal(),
   direction: "debit",
@@ -56,6 +58,9 @@ export default function ReportWizardPage() {
   const [form, setForm] = useState(initialForm);
   const [file, setFile] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [createdCaseId, setCreatedCaseId] = useState(null);
+  const [createdCaseRecord, setCreatedCaseRecord] = useState(null);
+  const [completedCase, setCompletedCase] = useState(null);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,10 +78,10 @@ export default function ReportWizardPage() {
         return "Enter when the incident happened (an approximate time is fine).";
       }
     }
-    if (currentStep === 1) {
+    if (currentStep === 1 && !form.no_financial_loss) {
       const amount = Number(form.amount);
       if (!form.amount || Number.isNaN(amount) || amount <= 0) {
-        return "Enter the amount that left your account. It must be greater than zero.";
+        return "Enter the amount that left your account (or select 'No money has left my account').";
       }
     }
     return null;
@@ -114,70 +119,163 @@ export default function ReportWizardPage() {
     const category = labelFor(FRAUD_CATEGORIES, form.incident_type);
     const title =
       form.title.trim() ||
-      `${category} incident${form.amount ? ` — ${formatMoney(form.amount)}` : ""}`;
+      `${category} incident${!form.no_financial_loss && form.amount ? ` — ${formatMoney(form.amount)}` : ""}`;
 
     setSubmitting(true);
-    let created;
-    try {
-      created = await api.createCase({
-        title: title.slice(0, 200),
-        description: form.description.trim(),
-        incident_type: form.incident_type,
-        fraud_channel: form.fraud_channel,
-        incident_occurred_at: new Date(form.incident_occurred_at).toISOString(),
-        estimated_loss_amount: form.amount,
-        currency: "INR",
-        reporting_details: form.reporting_details.trim() || null,
-      });
-    } catch (creationProblem) {
-      setError(creationProblem);
-      setSubmitting(false);
-      return;
+    let caseId = createdCaseId;
+    let caseRecord = createdCaseRecord;
+    if (!caseId) {
+      try {
+        const created = await api.createCase({
+          title: title.slice(0, 200),
+          description: form.description.trim(),
+          incident_type: form.incident_type,
+          fraud_channel: form.fraud_channel,
+          incident_occurred_at: new Date(form.incident_occurred_at).toISOString(),
+          estimated_loss_amount: form.no_financial_loss ? "0.00" : form.amount,
+          currency: "INR",
+          reporting_details: form.reporting_details.trim() || null,
+        });
+        caseId = created.id;
+        caseRecord = created;
+        setCreatedCaseId(caseId);
+        setCreatedCaseRecord(created);
+      } catch (creationProblem) {
+        setError(creationProblem);
+        setSubmitting(false);
+        return;
+      }
     }
 
-    try {
-      await api.createTransaction(created.id, {
-        amount: form.amount,
-        currency: "INR",
-        transaction_at: new Date(form.transaction_at).toISOString(),
-        direction: form.direction,
-        authorization_type: form.authorization_type,
-        channel: form.transaction_channel || null,
-        counterparty_name: form.counterparty_name.trim() || null,
-        utr_reference: form.utr_reference.trim() || null,
-      });
-    } catch {
-      // The case exists; the transaction can be added again from the case screen.
+    const partialFailures = [];
+    if (!form.no_financial_loss) {
+      try {
+        await api.createTransaction(caseId, {
+          amount: form.amount,
+          currency: "INR",
+          transaction_at: new Date(form.transaction_at).toISOString(),
+          direction: form.direction,
+          authorization_type: form.authorization_type,
+          channel: form.transaction_channel || null,
+          counterparty_name: form.counterparty_name.trim() || null,
+          utr_reference: form.utr_reference.trim() || null,
+        });
+      } catch (txProblem) {
+        partialFailures.push(`Transaction could not be saved: ${txProblem.message}`);
+      }
     }
 
     if (file) {
       try {
-        await api.uploadEvidence(created.id, file, {
+        await api.uploadEvidence(caseId, file, {
           evidence_type: form.evidence_type,
           description: form.evidence_description.trim() || null,
         });
-      } catch {
-        // Evidence is optional; the case is still usable without it.
+      } catch (evProblem) {
+        partialFailures.push(`Evidence could not be uploaded: ${evProblem.message}`);
       }
     }
 
     try {
-      await api.analyze(created.id);
+      await api.analyze(caseId);
     } catch {
       // Analysis is deterministic and can be re-run later.
     }
 
     try {
-      await api.roadmap(created.id);
+      await api.roadmap(caseId);
     } catch {
       // The roadmap is generated on first view if this call fails.
     }
 
-    navigate(`/cases/${created.id}/roadmap`);
+    if (partialFailures.length > 0) {
+      setError(
+        new Error(
+          `Your case was created, but some details failed to save: ${partialFailures.join(" ")} Fix the issue or continue to your roadmap.`,
+        ),
+      );
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    setCompletedCase(caseRecord || { id: caseId, public_reference: caseId.slice(0, 8), title });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   const stepMeta = STEPS[step];
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
+
+  if (completedCase) {
+    return (
+      <div className="stack stack-lg">
+        <div className="page-heading">
+          <div>
+            <p className="breadcrumb">
+              <Link to="/dashboard">Dashboard</Link> / Case created
+            </p>
+            <h1>Case file created successfully</h1>
+            <p>
+              Your incident details, recovery roadmap, and audit record are saved under your
+              account.
+            </p>
+          </div>
+        </div>
+
+        <Card className="success-hero-card">
+          <div className="success-hero">
+            <div className="success-icon" aria-hidden="true">
+              <Icon name="check" size={28} />
+            </div>
+            <div>
+              <span className="badge badge-positive">Saved to case file</span>
+              <h2 style={{ fontSize: "1.3rem", marginTop: "0.45rem" }}>
+                {completedCase.title}
+              </h2>
+              <p className="muted small" style={{ marginTop: "0.25rem" }}>
+                Case Reference:{" "}
+                <strong className="mono" style={{ color: "var(--navy)" }}>
+                  {completedCase.public_reference}
+                </strong>
+                {" · "}
+                {labelFor(FRAUD_CATEGORIES, form.incident_type)}
+                {" · "}
+                {form.no_financial_loss
+                  ? "₹0.00 recorded loss"
+                  : formatMoney(form.amount || 0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="success-actions">
+            <button
+              type="button"
+              className="button button-primary button-large"
+              onClick={() => navigate(`/cases/${completedCase.id}/documents`)}
+            >
+              <Icon name="documents" size={16} /> Prepare Complaint Documents
+            </button>
+            <button
+              type="button"
+              className="button button-teal button-large"
+              onClick={() => navigate(`/cases/${completedCase.id}/roadmap`)}
+            >
+              <Icon name="roadmap" size={16} /> Open Recovery Roadmap
+            </button>
+            <Link to={`/cases/${completedCase.id}`} className="button button-ghost button-large">
+              View Case Overview
+            </Link>
+          </div>
+        </Card>
+
+        <Notice>
+          <strong>Next step tip:</strong> Use <strong>Prepare Complaint Documents</strong> to
+          auto-generate prefilled cybercrime, bank, UPI, or police complaint drafts ready for
+          review and PDF download.
+        </Notice>
+      </div>
+    );
+  }
 
   return (
     <div className="stack">
@@ -222,6 +320,16 @@ export default function ReportWizardPage() {
         </aside>
 
         <section className="wizard-card">
+          <div className="wizard-mobile-progress">
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", fontWeight: 600 }}>
+              <span>Step {step + 1} of {STEPS.length}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="wizard-progress-bar" style={{ marginTop: "0.35rem" }}>
+              <span style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+
           <div className="wizard-card-head">
             <div className="step-eyebrow">
               Step {step + 1} of {STEPS.length}
@@ -312,7 +420,27 @@ export default function ReportWizardPage() {
 
           {step === 1 && (
             <div className="stack">
-              <div className="form-grid">
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.no_financial_loss}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, no_financial_loss: event.target.checked }))
+                  }
+                />
+                <span>
+                  No money has left my account (attempted fraud, phishing link, or loss amount unknown yet)
+                </span>
+              </label>
+
+              {form.no_financial_loss ? (
+                <Notice>
+                  Your case will be saved with ₹0 recorded loss and no transaction yet. You can add a
+                  transaction later from the case workspace if an unauthorised debit appears.
+                </Notice>
+              ) : (
+                <>
+                  <div className="form-grid">
                 <Field label="Amount debited (INR)" htmlFor="amount">
                   <input
                     id="amount"
@@ -400,6 +528,8 @@ export default function ReportWizardPage() {
                   ))}
                 </div>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -476,24 +606,30 @@ export default function ReportWizardPage() {
 
               <div className="review-block">
                 <h3>Transaction</h3>
-                <dl className="detail-list detail-list-inline">
-                  <div>
-                    <dt>Amount</dt>
-                    <dd>{formatMoney(form.amount || 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Authorisation</dt>
-                    <dd>{labelFor(AUTHORIZATION_TYPES, form.authorization_type)}</dd>
-                  </div>
-                  <div>
-                    <dt>UTR</dt>
-                    <dd className="mono">{form.utr_reference || "Not recorded"}</dd>
-                  </div>
-                  <div>
-                    <dt>Transaction time</dt>
-                    <dd>{form.transaction_at?.replace("T", " ")}</dd>
-                  </div>
-                </dl>
+                {form.no_financial_loss ? (
+                  <p className="small muted">
+                    No financial loss recorded (attempted fraud or loss unknown yet).
+                  </p>
+                ) : (
+                  <dl className="detail-list detail-list-inline">
+                    <div>
+                      <dt>Amount</dt>
+                      <dd>{formatMoney(form.amount || 0)}</dd>
+                    </div>
+                    <div>
+                      <dt>Authorisation</dt>
+                      <dd>{labelFor(AUTHORIZATION_TYPES, form.authorization_type)}</dd>
+                    </div>
+                    <div>
+                      <dt>UTR</dt>
+                      <dd className="mono">{form.utr_reference || "Not recorded"}</dd>
+                    </div>
+                    <div>
+                      <dt>Transaction time</dt>
+                      <dd>{form.transaction_at?.replace("T", " ")}</dd>
+                    </div>
+                  </dl>
+                )}
               </div>
 
               <div className="review-block">
@@ -544,14 +680,25 @@ export default function ReportWizardPage() {
                   Continue →
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="button button-primary button-large"
-                  disabled={submitting}
-                  onClick={handleSubmit}
-                >
-                  {submitting ? "Saving your case…" : "Save case & build roadmap"}
-                </button>
+                <>
+                  {createdCaseId && (
+                    <Link to={`/cases/${createdCaseId}/roadmap`} className="button button-ghost">
+                      Continue to roadmap anyway →
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    className="button button-primary button-large"
+                    disabled={submitting}
+                    onClick={handleSubmit}
+                  >
+                    {submitting
+                      ? "Saving your case…"
+                      : createdCaseId
+                        ? "Retry saving details"
+                        : "Save case & build roadmap"}
+                  </button>
+                </>
               )}
             </div>
           </div>

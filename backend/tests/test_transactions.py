@@ -83,6 +83,31 @@ def test_authentication_secrets_are_rejected(client: TestClient, account, case) 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "sensitive_data_rejected"
 
+    reversed_otp = client.post(
+        "/api/v1/cases",
+        headers=account["headers"],
+        json={"title": "Test", "description": "482910 was the OTP I shared on the call."},
+    )
+    assert reversed_otp.status_code == 400
+    assert reversed_otp.json()["error"]["code"] == "sensitive_data_rejected"
+
+    ev_otp = client.post(
+        f"/api/v1/cases/{case['id']}/evidence",
+        headers=account["headers"],
+        files={"file": ("alert.txt", b"alert", "text/plain")},
+        data={"evidence_type": "other", "description": "OTP is 482910"},
+    )
+    assert ev_otp.status_code == 400
+    assert ev_otp.json()["error"]["code"] == "sensitive_data_rejected"
+
+    act_otp = client.post(
+        f"/api/v1/cases/{case['id']}/actions",
+        headers=account["headers"],
+        json={"action_type": "follow_up", "title": "Check OTP 482910", "description": "UPI PIN 4921"},
+    )
+    assert act_otp.status_code == 400
+    assert act_otp.json()["error"]["code"] == "sensitive_data_rejected"
+
 
 def test_transaction_from_another_case_is_not_visible(
     client: TestClient, account, other_account, case

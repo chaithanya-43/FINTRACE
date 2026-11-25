@@ -11,8 +11,11 @@ from app.core.exceptions import InvalidRequest
 
 _SECRET_PATTERNS = (
     re.compile(r"\b(?:otp|one[\s-]?time\s+password)\b[^.\n]{0,20}?\b\d{4,8}\b", re.I),
+    re.compile(r"\b\d{4,8}\b[^.\n]{0,20}?\b(?:otp|one[\s-]?time\s+password)\b", re.I),
     re.compile(r"\b(?:upi\s*pin|atm\s*pin|card\s*pin|pin)\b\s*(?:is|[:=])?\s*\d{4,6}\b", re.I),
+    re.compile(r"\b\d{4,6}\b[^.\n]{0,16}?\b(?:upi\s*pin|atm\s*pin|card\s*pin)\b", re.I),
     re.compile(r"\bcvv\b\s*(?:is|[:=])?\s*\d{3,4}\b", re.I),
+    re.compile(r"\b\d{3,4}\b[^.\n]{0,12}?\bcvv\b", re.I),
     re.compile(r"\b(?:password|passcode)\b\s*(?:is|[:=])\s*\S+", re.I),
     re.compile(r"\b(?:net\s*banking|internet\s*banking)\s+(?:password|pin)\b\s*(?:is|[:=])?\s*\S+", re.I),
 )

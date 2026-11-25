@@ -93,3 +93,22 @@ def test_analysis_is_deterministic_and_labels_itself(client: TestClient, account
     assert body["suggested_fraud_channel"] == "upi"
     assert body["missing_information"]
     assert any(fact["provenance"] == "user_provided" for fact in body["extracted_facts"])
+
+
+def test_analysis_recognizes_recorded_transaction_utr(client: TestClient, account, case) -> None:
+    client.post(
+        f"/api/v1/cases/{case['id']}/transactions",
+        headers=account["headers"],
+        json={
+            "amount": "15000.00",
+            "authorization_type": "unauthorized",
+            "channel": "upi",
+            "utr_reference": "UPI202611250001",
+        },
+    )
+    response = client.post(
+        f"/api/v1/cases/{case['id']}/analyze", headers=account["headers"]
+    )
+    assert response.status_code == 200
+    missing = response.json()["missing_information"]
+    assert not any("UTR or reference numbers" in item for item in missing)

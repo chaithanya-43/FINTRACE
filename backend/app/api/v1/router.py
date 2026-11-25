@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     auth,
     cases,
     complaints,
+    documents,
     evidence,
     health,
     recovery,
@@ -20,5 +21,6 @@ api_router.include_router(transactions.router)
 api_router.include_router(evidence.router)
 api_router.include_router(regulatory.router)
 api_router.include_router(complaints.router)
+api_router.include_router(documents.router)
 api_router.include_router(recovery.router)
 api_router.include_router(admin.router)

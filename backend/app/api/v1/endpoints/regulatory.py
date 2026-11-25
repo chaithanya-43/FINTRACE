@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user, load_authorized_case
+from app.core.deps import get_current_user, load_authorized_case, require_roles
 from app.core.exceptions import NotFound
 from app.database.connection import get_db
 from app.models import User
@@ -15,6 +15,7 @@ from app.schemas.regulatory import (
     AssessmentListResponse,
     RuleRead,
 )
+from app.utils.enums import Role
 
 router = APIRouter(tags=["regulatory"])
 
@@ -83,7 +84,7 @@ def list_assessments(
 def review_assessment(
     assessment_id: uuid.UUID,
     payload: AssessmentReviewRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(Role.INVESTIGATOR.value, Role.ADMINISTRATOR.value)),
     db: Session = Depends(get_db),
 ) -> AssessmentRead:
     assessment = engine.get_assessment(db, assessment_id)

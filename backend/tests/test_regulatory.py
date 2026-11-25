@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 
-from app.models import RegulatoryRule
+from app.models import RegulatoryRule, User
 
 RULE_PAYLOAD = {
     "logic": "all",
@@ -122,7 +122,7 @@ def test_changed_facts_create_a_superseding_assessment(
     assert len(history["assessments"]) == 2
 
 
-def test_review_updates_only_review_columns(client: TestClient, account, case, db) -> None:
+def test_citizen_cannot_review_assessment(client: TestClient, account, case, db) -> None:
     seed_rule(db)
     assessment = client.post(
         f"/api/v1/cases/{case['id']}/assessments", headers=account["headers"], json={}
@@ -131,6 +131,26 @@ def test_review_updates_only_review_columns(client: TestClient, account, case, d
     response = client.patch(
         f"/api/v1/assessments/{assessment['id']}/review",
         headers=account["headers"],
+        json={"review_status": "confirmed", "review_note": "Self review attempt."},
+    )
+    assert response.status_code == 403
+
+
+def test_review_updates_only_review_columns(
+    client: TestClient, account, other_account, case, db
+) -> None:
+    seed_rule(db)
+    assessment = client.post(
+        f"/api/v1/cases/{case['id']}/assessments", headers=account["headers"], json={}
+    ).json()[0]
+
+    reviewer = db.get(User, other_account["user"]["id"])
+    reviewer.role = "administrator"
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/assessments/{assessment['id']}/review",
+        headers=other_account["headers"],
         json={"review_status": "confirmed", "review_note": "Checked against the record."},
     )
     assert response.status_code == 200

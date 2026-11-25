@@ -190,5 +190,28 @@ export const api = {
       body: payload,
     }),
 
+  documentCatalog: () => request("/documents/catalog"),
+  prefillDocument: (caseId, documentType) =>
+    request(`/cases/${caseId}/documents/prefill?document_type=${encodeURIComponent(documentType)}`),
+  listDocuments: (caseId) => request(`/cases/${caseId}/documents`),
+  generateDocument: (caseId, payload) =>
+    request(`/cases/${caseId}/documents/generate`, { method: "POST", body: payload }),
+  updateDocument: (caseId, draftId, payload) =>
+    request(`/cases/${caseId}/documents/${draftId}`, { method: "PATCH", body: payload }),
+  downloadDocumentPdf: async (caseId, draftId) => {
+    const headers = {};
+    if (getToken()) {
+      headers.Authorization = `Bearer ${getToken()}`;
+    }
+    const response = await fetch(
+      `${API_BASE_URL}/cases/${caseId}/documents/${draftId}/pdf`,
+      { headers },
+    );
+    if (!response.ok) {
+      throw new ApiError("Could not export PDF for this document draft.", response.status);
+    }
+    return response.blob();
+  },
+
   caseAudit: (caseId) => request(`/cases/${caseId}/audit`),
 };

@@ -16,7 +16,9 @@ from app.utils.sensitive import assert_no_authentication_secrets
 
 
 def create_case(db: Session, *, user: User, data: dict) -> Case:
-    assert_no_authentication_secrets(data.get("description"), data.get("reporting_details"))
+    assert_no_authentication_secrets(
+        data.get("title"), data.get("description"), data.get("reporting_details")
+    )
 
     payload = dict(data)
     payload["incident_type"] = policies.normalise_incident_type(
@@ -93,7 +95,9 @@ def update_case(db: Session, *, case: Case, user: User, data: dict) -> Case:
     if not changes:
         return case
 
-    assert_no_authentication_secrets(changes.get("description"), changes.get("reporting_details"))
+    assert_no_authentication_secrets(
+        changes.get("title"), changes.get("description"), changes.get("reporting_details")
+    )
 
     target_status = changes.pop("internal_status", None)
     before = audit.snapshot(case)

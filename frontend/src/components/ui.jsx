@@ -1,3 +1,5 @@
+import { Icon } from "./Icons";
+
 const RESULT_TONES = {
   applies: "positive",
   may_apply: "warning",
@@ -22,6 +24,8 @@ const RESULT_TONES = {
   recovery: "warning",
   closed: "positive",
   draft: "neutral",
+  reviewed: "positive",
+  exported: "teal",
   ready: "info",
   submitted: "info",
   acknowledged: "positive",
@@ -70,18 +74,21 @@ export function ErrorBanner({ error, onDismiss }) {
   const details = Array.isArray(error.details) ? error.details : null;
   return (
     <div className="alert alert-error" role="alert">
-      <div>
-        <strong>{error.message || "Something went wrong."}</strong>
-        {details && (
-          <ul>
-            {details.map((item) => (
-              <li key={`${item.field}-${item.message}`}>
-                {item.field ? `${item.field}: ` : ""}
-                {item.message}
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="alert-with-icon">
+        <Icon name="emergency" size={18} className="alert-icon" />
+        <div>
+          <strong>{error.message || "Something went wrong."}</strong>
+          {details && (
+            <ul>
+              {details.map((item) => (
+                <li key={`${item.field}-${item.message}`}>
+                  {item.field ? `${item.field}: ` : ""}
+                  {item.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       {onDismiss && (
         <button type="button" className="link-button" onClick={onDismiss}>
@@ -93,7 +100,15 @@ export function ErrorBanner({ error, onDismiss }) {
 }
 
 export function Notice({ children, tone = "info" }) {
-  return <div className={`alert alert-${tone === "error" ? "error" : tone}`}>{children}</div>;
+  const iconName = tone === "error" || tone === "warning" ? "emergency" : "info";
+  return (
+    <div className={`alert alert-${tone === "error" ? "error" : tone}`}>
+      <div className="alert-with-icon">
+        <Icon name={iconName} size={17} className="alert-icon" />
+        <div>{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export function Loading({ label = "Loading…" }) {
@@ -152,4 +167,42 @@ export function ProgressBar({ value, total, label }) {
 
 export function DemoTag({ children = "Demonstration data" }) {
   return <span className="demo-tag">{children}</span>;
+}
+
+export function ConfirmModal({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  confirmTone = "primary",
+  busy = false,
+  onConfirm,
+  onCancel,
+}) {
+  if (!open) {
+    return null;
+  }
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <div className="modal-card">
+        <h3 id="confirm-modal-title">{title}</h3>
+        <p className="muted small" style={{ marginTop: "0.45rem" }}>
+          {message}
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="button button-ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`button button-${confirmTone}`}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? "Working…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

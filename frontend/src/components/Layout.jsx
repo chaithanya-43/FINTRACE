@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import { Link, navigate, usePath } from "../router";
+import { Icon } from "./Icons";
 
 export function Brand({ compact = false }) {
   return (
@@ -29,26 +30,27 @@ const NAV_GROUPS = [
   {
     label: "Workspace",
     items: [
-      { to: "/dashboard", label: "Case dashboard", icon: "◧" },
-      { to: "/report", label: "Report an incident", icon: "✚" },
-      { to: "/roadmap", label: "Recovery roadmap", icon: "◎" },
+      { to: "/dashboard", label: "Case dashboard", icon: "dashboard" },
+      { to: "/report", label: "Report an incident", icon: "plus" },
+      { to: "/roadmap", label: "Recovery roadmap", icon: "roadmap" },
     ],
   },
   {
     label: "Case records",
     items: [
-      { to: "/transactions", label: "Transaction details", icon: "⇄" },
-      { to: "/evidence", label: "Evidence centre", icon: "▤" },
-      { to: "/analysis", label: "Incident analysis", icon: "⌕" },
-      { to: "/complaints", label: "Complaint tracker", icon: "✉" },
+      { to: "/transactions", label: "Transaction details", icon: "transactions" },
+      { to: "/evidence", label: "Evidence centre", icon: "evidence" },
+      { to: "/analysis", label: "Incident analysis", icon: "analysis" },
+      { to: "/complaints", label: "Complaint tracker", icon: "complaints" },
+      { to: "/documents", label: "Document assistant", icon: "documents" },
     ],
   },
   {
     label: "Intelligence & assurance",
     items: [
-      { to: "/regulatory", label: "Regulatory intelligence", icon: "§" },
-      { to: "/audit", label: "Audit history", icon: "◷" },
-      { to: "/emergency", label: "Emergency assistance", icon: "!" },
+      { to: "/regulatory", label: "Regulatory intelligence", icon: "regulatory" },
+      { to: "/audit", label: "Audit history", icon: "audit" },
+      { to: "/emergency", label: "Emergency assistance", icon: "emergency" },
     ],
   },
 ];
@@ -91,7 +93,7 @@ export function AppShell({ children }) {
                   className={`side-link ${isActive(item.to) ? "active" : ""}`.trim()}
                 >
                   <span className="side-icon" aria-hidden="true">
-                    {item.icon}
+                    <Icon name={item.icon} size={16} />
                   </span>
                   {item.label}
                 </Link>
@@ -140,6 +142,16 @@ export function AppShell({ children }) {
             <Link to="/report" className="button button-primary button-small">
               New report
             </Link>
+            <button
+              type="button"
+              className="button button-ghost button-small mobile-signout"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              Sign out
+            </button>
           </div>
         </header>
         <main className="page">{children}</main>

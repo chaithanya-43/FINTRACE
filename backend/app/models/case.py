@@ -80,6 +80,12 @@ class Case(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         order_by="RegulatoryAssessment.assessed_at.desc()",
     )
     complaints = relationship("Complaint", back_populates="case")
+    document_drafts = relationship(
+        "DocumentDraft",
+        back_populates="case",
+        cascade="all, delete-orphan",
+        order_by="DocumentDraft.updated_at.desc()",
+    )
     recovery_actions = relationship(
         "RecoveryAction",
         back_populates="case",

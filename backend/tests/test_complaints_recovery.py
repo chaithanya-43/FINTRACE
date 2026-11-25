@@ -134,3 +134,38 @@ def test_completing_an_action_records_completion(client: TestClient, account, ca
         f"/api/v1/cases/{case['id']}/roadmap", headers=account["headers"]
     ).json()
     assert refreshed["progress"]["completed"] == 1
+
+
+def test_duplicate_complaint_reference_is_rejected(client: TestClient, account, case) -> None:
+    first = client.post(
+        f"/api/v1/cases/{case['id']}/complaints",
+        headers=account["headers"],
+        json={"channel": "bank", "reference_number": "BNK-DUP-1", "submission_status": "submitted"},
+    )
+    assert first.status_code == 201
+
+    duplicate = client.post(
+        f"/api/v1/cases/{case['id']}/complaints",
+        headers=account["headers"],
+        json={"channel": "bank", "reference_number": "BNK-DUP-1", "submission_status": "submitted"},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "duplicate_complaint_reference"
+
+
+def test_no_loss_phishing_roadmap_adds_credential_hardening(client: TestClient, account) -> None:
+    case = client.post(
+        "/api/v1/cases",
+        headers=account["headers"],
+        json={
+            "title": "Fake KYC phishing link",
+            "description": "Clicked a fake KYC link via SMS before any debit occurred.",
+            "incident_type": "otp_phishing",
+            "fraud_channel": "sms",
+            "estimated_loss_amount": "0.00",
+        },
+    ).json()
+    roadmap = client.get(f"/api/v1/cases/{case['id']}/roadmap", headers=account["headers"]).json()
+    action_types = {a["action_type"] for a in roadmap["actions"]}
+    assert "secure_credentials" in action_types
+    assert "prepare_complaint" not in action_types

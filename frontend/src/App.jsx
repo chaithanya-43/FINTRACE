@@ -8,6 +8,7 @@ import AuditPage from "./pages/AuditPage";
 import CaseDetailPage from "./pages/CaseDetailPage";
 import ComplaintsPage from "./pages/ComplaintsPage";
 import DashboardPage from "./pages/DashboardPage";
+import DocumentsPage from "./pages/DocumentsPage";
 import EmergencyPage from "./pages/EmergencyPage";
 import EvidencePage from "./pages/EvidencePage";
 import LandingPage from "./pages/LandingPage";
@@ -112,6 +113,8 @@ function Routes() {
     page = <RoadmapPage />;
   } else if (path === "/complaints") {
     page = <ComplaintsPage />;
+  } else if (path === "/documents") {
+    page = <DocumentsPage />;
   } else if (path === "/audit") {
     page = <AuditPage />;
   } else if (caseRoute) {

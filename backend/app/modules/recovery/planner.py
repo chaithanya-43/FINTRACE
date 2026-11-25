@@ -45,31 +45,77 @@ def recommend(
     card_channel = case.fraud_channel == "card" or any(
         item.channel == "card" for item in transactions
     )
+    explicit_no_loss = (
+        not transactions
+        and case.estimated_loss_amount is not None
+        and case.estimated_loss_amount == 0
+    )
+    no_loss_recorded = not transactions and (
+        case.estimated_loss_amount is None or case.estimated_loss_amount == 0
+    )
+    compromise_risk = case.incident_type in (
+        "otp_phishing",
+        "sim_swap",
+        "impersonation",
+        "net_banking_fraud",
+    ) or case.fraud_channel in ("sms", "email", "whatsapp", "mobile_app")
 
     actions: list[dict] = [
         {
             "action_type": "call_helpline",
-            "title": "Call the 1930 cybercrime helpline",
-            "description": "Report the fraud on the national helpline and note the reference given.",
-            "instructions": "Dial 1930. Have transaction dates, amounts and UTR references ready.",
+            "title": (
+                "Report the phishing attempt on 1930 or Chakshu"
+                if explicit_no_loss
+                else "Call the 1930 cybercrime helpline"
+            ),
+            "description": (
+                "Report the suspicious caller, message or phishing link so it can be flagged."
+                if explicit_no_loss
+                else "Report the fraud on the national helpline and note the reference given."
+            ),
+            "instructions": (
+                "Dial 1930 or submit suspect communication details on sancharsaathi.gov.in (Chakshu)."
+                if explicit_no_loss
+                else "Dial 1930. Have transaction dates, amounts and UTR references ready."
+            ),
             "priority": RecoveryPriority.CRITICAL.value if urgent else RecoveryPriority.HIGH.value,
             "due_at": moment + timedelta(hours=6),
         },
         {
             "action_type": "report_cybercrime",
             "title": "File the report on cybercrime.gov.in",
-            "description": "Submit the incident on the national cybercrime reporting portal yourself.",
-            "instructions": (
-                "FINTRACE cannot submit this for you. Attach the evidence you uploaded "
-                "and copy the acknowledgement number back into the complaint record."
+            "description": (
+                "Log the attempted fraud or phishing incident on the national cybercrime portal."
+                if explicit_no_loss
+                else "Submit the incident on the national cybercrime reporting portal yourself."
             ),
-            "priority": RecoveryPriority.CRITICAL.value if urgent else RecoveryPriority.HIGH.value,
+            "instructions": (
+                "FINTRACE cannot submit this for you. Attach screenshots of the phishing link or message."
+                if explicit_no_loss
+                else (
+                    "FINTRACE cannot submit this for you. Attach the evidence you uploaded "
+                    "and copy the acknowledgement number back into the complaint record."
+                )
+            ),
+            "priority": (
+                RecoveryPriority.HIGH.value
+                if explicit_no_loss
+                else (RecoveryPriority.CRITICAL.value if urgent else RecoveryPriority.HIGH.value)
+            ),
             "due_at": moment + timedelta(hours=24),
         },
         {
             "action_type": "contact_bank",
-            "title": "Notify your bank's fraud desk",
-            "description": "Ask the bank to flag the transaction and explain the dispute process.",
+            "title": (
+                "Alert your bank's fraud desk as a precaution"
+                if explicit_no_loss
+                else "Notify your bank's fraud desk"
+            ),
+            "description": (
+                "Inform the bank if you clicked a phishing link or shared details, and ask for precautionary monitoring."
+                if explicit_no_loss
+                else "Ask the bank to flag the transaction and explain the dispute process."
+            ),
             "instructions": (
                 "Use the number printed on your card or in the bank app, not a number "
                 "from the suspect conversation."
@@ -78,6 +124,41 @@ def recommend(
             "due_at": moment + timedelta(hours=12 if urgent else 48),
         },
     ]
+
+    if no_loss_recorded and compromise_risk:
+        actions.append(
+            {
+                "action_type": "secure_credentials",
+                "title": "Change banking passwords, UPI PIN and email password",
+                "description": (
+                    "Because no debit is recorded yet, immediately rotate credentials in your official bank and email apps."
+                ),
+                "instructions": (
+                    "Never enter passwords, OTPs or PINs into FINTRACE. Reset them only inside your official bank/UPI app and enable 2FA."
+                ),
+                "priority": RecoveryPriority.CRITICAL.value,
+                "due_at": moment + timedelta(hours=2),
+            }
+        )
+        if case.incident_type in ("otp_phishing", "sim_swap") or case.fraud_channel in (
+            "sms",
+            "mobile_app",
+            "phone_call",
+        ):
+            actions.append(
+                {
+                    "action_type": "device_sim_check",
+                    "title": "Check device for remote-access apps and SIM/call-forwarding changes",
+                    "description": (
+                        "Verify no screen-sharing APK was installed and confirm your mobile network and SMS alerts still work normally."
+                    ),
+                    "instructions": (
+                        "Uninstall unfamiliar apps, review app permissions, and check with your telecom provider if signal drops unexpectedly."
+                    ),
+                    "priority": RecoveryPriority.HIGH.value,
+                    "due_at": moment + timedelta(hours=4),
+                }
+            )
 
     if unauthorized:
         actions.append(
@@ -118,8 +199,8 @@ def recommend(
             }
         )
 
-    actions.extend(
-        [
+    if not explicit_no_loss:
+        actions.append(
             {
                 "action_type": "prepare_complaint",
                 "title": "Prepare the written complaint",
@@ -130,7 +211,11 @@ def recommend(
                 ),
                 "priority": RecoveryPriority.MEDIUM.value,
                 "due_at": moment + timedelta(days=3),
-            },
+            }
+        )
+
+    actions.extend(
+        [
             {
                 "action_type": "follow_up",
                 "title": "Follow up and record the official status",

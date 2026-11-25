@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import AnalysisTab from "../components/case/AnalysisTab";
 import AuditTab from "../components/case/AuditTab";
 import ComplaintsTab from "../components/case/ComplaintsTab";
+import DocumentsTab from "../components/case/DocumentsTab";
 import EvidenceTab from "../components/case/EvidenceTab";
 import OverviewTab from "../components/case/OverviewTab";
 import RoadmapView from "../components/case/RoadmapView";
 import RegulatoryTab from "../components/case/RegulatoryTab";
 import TransactionsTab from "../components/case/TransactionsTab";
-import { Badge, Card, ErrorBanner, Loading, Notice } from "../components/ui";
+import { Badge, Card, ConfirmModal, ErrorBanner, Loading, Notice } from "../components/ui";
 import { CASE_STATUSES, formatDate, labelFor, FRAUD_CATEGORIES } from "../constants";
 import { Link, navigate } from "../router";
 import { api } from "../services/api";
@@ -21,6 +22,7 @@ const TABS = [
   ["regulations", "Regulations"],
   ["roadmap", "Roadmap"],
   ["complaints", "Complaints"],
+  ["documents", "Documents"],
   ["audit", "Audit"],
 ];
 
@@ -30,7 +32,14 @@ export default function CaseDetailPage({ caseId, section = "overview" }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const activeTabRef = useRef(null);
   const tab = TABS.some(([value]) => value === section) ? section : "overview";
+
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [tab]);
 
   const load = useCallback(async () => {
     const [caseRecord, counts] = await Promise.all([
@@ -73,11 +82,15 @@ export default function CaseDetailPage({ caseId, section = "overview" }) {
 
   async function handleArchive() {
     setActionError(null);
+    setArchiving(true);
     try {
       await api.archiveCase(caseId);
+      setArchiveConfirmOpen(false);
       await load();
     } catch (problem) {
       setActionError(problem);
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -125,7 +138,11 @@ export default function CaseDetailPage({ caseId, section = "overview" }) {
             </select>
           </label>
           {!caseData.is_archived && (
-            <button type="button" className="button button-ghost" onClick={handleArchive}>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setArchiveConfirmOpen(true)}
+            >
               Archive
             </button>
           )}
@@ -144,6 +161,7 @@ export default function CaseDetailPage({ caseId, section = "overview" }) {
         {TABS.map(([value, label]) => (
           <button
             key={value}
+            ref={tab === value ? activeTabRef : undefined}
             type="button"
             className={`tab ${tab === value ? "tab-active" : ""}`.trim()}
             onClick={() => {
@@ -175,7 +193,21 @@ export default function CaseDetailPage({ caseId, section = "overview" }) {
       {tab === "complaints" && (
         <ComplaintsTab caseId={caseId} isArchived={caseData.is_archived} />
       )}
+      {tab === "documents" && (
+        <DocumentsTab caseId={caseId} isArchived={caseData.is_archived} />
+      )}
       {tab === "audit" && <AuditTab caseId={caseId} />}
+
+      <ConfirmModal
+        open={archiveConfirmOpen}
+        title="Archive this case?"
+        message="Archived cases stay visible for reference and audit, but no new transactions, evidence, drafts, or status updates can be added afterwards."
+        confirmLabel="Archive case"
+        confirmTone="danger"
+        busy={archiving}
+        onConfirm={handleArchive}
+        onCancel={() => setArchiveConfirmOpen(false)}
+      />
 
       <Card title="About this workspace" className="subtle-card">
         <p className="muted small">
