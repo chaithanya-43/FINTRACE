@@ -19,6 +19,7 @@ frontend/dist/
 # Database and evidence storage
 storage/*
 !storage/.gitkeep
+backend/tests/.evidence/
 
 # IDE and operating system
 .vscode/
